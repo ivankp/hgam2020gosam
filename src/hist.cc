@@ -4,10 +4,11 @@
 #include <map>
 #include <filesystem>
 #include <optional>
+#include <memory>
 
 #include <TFile.h>
 #include <TKey.h>
-#include <TTree.h>
+#include <TChain.h>
 #include <TEnv.h>
 #include <TLorentzVector.h>
 
@@ -20,7 +21,6 @@
   "\033[33m" STR(__LINE__) ": " \
   "\033[36m" #var ":\033[0m " << (var) << std::endl;
 
-#include "Higgs2diphoton.hh"
 #include "ivanp/error.hh"
 #include "ivanp/branch_reader.hh"
 #include "ivanp/enumerate.hh"
@@ -28,6 +28,9 @@
 #include "ivanp/hist/histograms.hh"
 #include "ivanp/hist/bins.hh"
 #include "ivanp/hist/json.hh"
+
+#include "reweighter.hh"
+#include "Higgs2diphoton.hh"
 
 using std::cout;
 using std::endl;
@@ -52,23 +55,25 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  double jet_pt_cut, jet_eta_cut;
-
+  // weight vector needs to be resized before histograms are created
   bin_t::weight.resize(2);
 
+  // create histograms ----------------------------------------------
   std::map<const char*,hist_t*,chars_less> hists;
 #define h_(NAME) \
   hist_t h_##NAME; \
   hists[#NAME] = &h_##NAME;
 
-#include ".build/punch.hh"
+#include ".build/punch.hh" // defines cards_names
+
+  // read histograms binning
   for (const char* card_name : cards_names) {
     cout << card_name << '\n';
     const auto file_name = cat("punchcards/",card_name,".punch");
     auto get = [card=TEnv(file_name.c_str())]
-    (const auto& key, const auto& x0) -> decltype(auto) {
-      return card.GetValue(ivanp::cstr(key),x0);
-    };
+      (const auto& key, const auto& x0) -> decltype(auto) {
+        return card.GetValue(ivanp::cstr(key),x0);
+      };
 
     hist_t::axes_type axes;
 
@@ -97,10 +102,55 @@ int main(int argc, char* argv[]) {
       if (j==0) break;
     }
     if (axes.empty()) THROW("no binning in file \"",file_name,"\"");
-    auto& h = *hists[card_name] = std::move(axes);
+    auto& h = *hists[card_name] = hist_t(std::move(axes));
     cout << nlohmann::json(h.axes()) << '\n';
   }
   cout << endl;
+
+  // Chain input files
+  std::unique_ptr<TChain> chain;
+  { auto file = std::make_unique<TFile>(argv[2]);
+    TTree* tree = nullptr;
+    for (auto* _key : *file->GetListOfKeys()) {
+      auto* key = static_cast<TKey*>(_key);
+      const auto* key_class = TClass::GetClass(key->GetClassName(),true);
+      if (!key_class) continue;
+      if (key_class->InheritsFrom(TTree::Class())) {
+        if (!tree)
+          tree = dynamic_cast<TTree*>(key->ReadObj());
+        else THROW("multiple trees in file \"",file->GetName(),"\"");
+      }
+    }
+    chain = std::make_unique<TChain>(tree->GetName());
+    cout << "Tree name: " << chain->GetName() << '\n';
+  }
+  for (int i=2; i<argc; ++i) {
+    cout << argv[i] << endl;
+    if (!chain->Add(argv[i],0)) THROW("failed to add file to chain");
+  }
+  cout << endl;
+
+  // Read branches
+  TTreeReader reader(&*chain);
+  branch_reader<int>
+    _id(reader,"id"),
+    _nparticle(reader,"nparticle");
+  branch_reader<double[],float[]>
+    _px(reader,"px"),
+    _py(reader,"py"),
+    _pz(reader,"pz"),
+    _E (reader,"E" );
+  branch_reader<int[]> _kf(reader,"kf");
+  branch_reader<double> _weight2(reader,"weight2");
+  branch_reader<double> _weight(reader,"weight");
+
+  std::optional<branch_reader<int>> _ncount;
+  for (auto* b : *reader.GetTree()->GetListOfBranches()) {
+    if (!strcmp(b->GetName(),"ncount")) {
+      _ncount.emplace(reader,"ncount");
+      break;
+    }
+  }
 
   std::vector<fj::PseudoJet> partons, jets;
   Higgs2diphoton higgs_decay(1234);
@@ -111,103 +161,77 @@ int main(int argc, char* argv[]) {
   fj::ClusterSequence::print_banner(); // get it out of the way
   cout << jet_def.description() << endl;
 
-  for (int argi=2; argi<argc; ++argi) {
-    TFile ntuple(argv[argi]);
-    if (ntuple.IsZombie())
-      THROW("cannot open ntuple file \"",argv[argi],"\"");
-    cout << ntuple.GetName() << endl;
+  const double jet_pt_cut = 30., jet_eta_cut = 4.4;
 
-    TTree *tree = ntuple.Get<TTree>("t3");
-    if (!tree) THROW("cannot get TTree \"t3\"");
-    cout << '\n';
+  cout << endl;
 
-    // Read branches
-    TTreeReader reader(tree);
-    branch_reader<int>
-      _id(reader,"id"),
-      _nparticle(reader,"nparticle");
-    branch_reader<double[],float[]>
-      _px(reader,"px"),
-      _py(reader,"py"),
-      _pz(reader,"pz"),
-      _E (reader,"E" );
-    branch_reader<int[]> _kf(reader,"kf");
-    branch_reader<double> _weight2(reader,"weight2");
-    branch_reader<double> _weight(reader,"weight");
+  // EVENT LOOP =====================================================
+  for (timed_counter cnt(reader.GetEntries()); reader.Next(); ++cnt) {
+    const bool new_id = [id=*_id]{
+      return (bin_t::id != id) ? ((bin_t::id = id),true) : false;
+    }();
 
-    std::optional<branch_reader<int>> _ncount;
-    for ( auto b : *reader.GetTree()->GetListOfBranches() ) {
-      if (!strcmp(b->GetName(),"ncount")) {
-        _ncount.emplace(reader,"ncount");
-        break;
+    // read 4-momenta -----------------------------------------------
+    partons.clear();
+    const unsigned np = *_nparticle;
+    bool got_higgs = false;
+    for (unsigned i=0; i<np; ++i) {
+      if (_kf[i] == 25) {
+        higgs.SetPxPyPzE(_px[i],_py[i],_pz[i],_E[i]);
+        got_higgs = true;
+      } else {
+        partons.emplace_back(_px[i],_py[i],_pz[i],_E[i]);
       }
     }
+    if (!got_higgs) THROW("event without Higgs boson (kf==25)");
 
-    // EVENT LOOP ===================================================
-    for (timed_counter cnt(reader.GetEntries()); reader.Next(); ++cnt) {
-      const bool new_id = [id=*_id]{
-        return (bin_t::id != id) ? ((bin_t::id = id),true) : false;
-      }();
+    // H -> γγ ----------------------------------------------------
+    photons = higgs_decay(higgs,new_id);
 
-      // read 4-momenta ---------------------------------------------
-      partons.clear();
-      const unsigned np = *_nparticle;
-      bool got_higgs = false;
-      for (unsigned i=0; i<np; ++i) {
-        if (_kf[i] == 25) {
-          higgs.SetPxPyPzE(_px[i],_py[i],_pz[i],_E[i]);
-          got_higgs = true;
-        } else {
-          partons.emplace_back(_px[i],_py[i],_pz[i],_E[i]);
-        }
-      }
-      if (!got_higgs) THROW("event without Higgs boson (kf==25)");
+    auto A_pT = photons | [](const auto& p){ return p.Pt(); };
+    if (A_pT[0] < A_pT[1]) {
+      std::swap(A_pT[0],A_pT[1]);
+      std::swap(photons[0],photons[1]);
+    }
+    const auto A_eta = photons | [](const auto& p){ return p.Eta(); };
 
-      // H -> γγ ---------------------------------------------------
-      photons = higgs_decay(higgs,new_id);
+    // Photon cuts --------------------------------------------------
+    if (
+      (A_pT[0] < 0.35*125.) or
+      (A_pT[1] < 0.25*125.) or
+      photon_eta_cut(std::abs(A_eta[0])) or
+      photon_eta_cut(std::abs(A_eta[1]))
+    ) continue;
 
-      auto A_pT = photons | [](const auto& p){ return p.Pt(); };
-      if (A_pT[0] < A_pT[1]) {
-        std::swap(A_pT[0],A_pT[1]);
-        std::swap(photons[0],photons[1]);
-      }
-      const auto A_eta = photons | [](const auto& p){ return p.Eta(); };
+    // Jets ---------------------------------------------------------
+    jets = fj::ClusterSequence(partons,jet_def)
+          .inclusive_jets(); // get clustered jets
 
-      // Photon cuts ------------------------------------------------
-      if (
-        (A_pT[0] < 0.35*125.) or
-        (A_pT[1] < 0.25*125.) or
-        photon_eta_cut(std::abs(A_eta[0])) or
-        photon_eta_cut(std::abs(A_eta[1]))
-      ) continue;
+    jets.erase( std::remove_if( jets.begin(), jets.end(), // apply jet cuts
+      [=](const auto& jet){
+        return (jet.pt() < jet_pt_cut)
+        or (std::abs(jet.eta()) > jet_eta_cut);
+      }), jets.end() );
+    std::sort( jets.begin(), jets.end(), // sort by pT
+      [](const auto& a, const auto& b){ return ( a.pt() > b.pt() ); });
+    const unsigned njets = jets.size(); // number of clustered jets
 
-      // Jets -------------------------------------------------------
-      jets = fj::ClusterSequence(partons,jet_def)
-            .inclusive_jets(); // get clustered jets
+    // set weights --------------------------------------------------
+    bin_t::weight[0] = *_weight2;
+    bin_t::weight[1] = *_weight;
 
-      jets.erase( std::remove_if( jets.begin(), jets.end(), // apply jet cuts
-        [=](const auto& jet){
-          return (jet.pt() < jet_pt_cut)
-          or (std::abs(jet.eta()) > jet_eta_cut);
-        }), jets.end() );
-      std::sort( jets.begin(), jets.end(), // sort by pT
-        [](const auto& a, const auto& b){ return ( a.pt() > b.pt() ); });
-      // const unsigned njets = jets.size(); // number of clustered jets
+    // Observables **************************************************
+    const auto pT_yy = higgs.Pt();
+    h_pT_yy(pT_yy);
 
-      // set weights ------------------------------------------------
-      bin_t::weight[0] = *_weight2;
-      bin_t::weight[1] = *_weight;
+    const auto yAbs_yy = std::abs(higgs.Rapidity());
+    h_yAbs_yy_vs_pT_yy(yAbs_yy,pT_yy);
 
-      // Observables ************************************************
-      const auto pT_yy = higgs.Pt();
-      h_pT_yy(pT_yy);
+    h_N_j_30(njets);
 
-      const auto yAbs_yy = std::abs(higgs.Rapidity());
-      h_yAbs_yy_vs_pT_yy(yAbs_yy,pT_yy);
-
-    } // end event loop
-    // ==============================================================
-  } // end file loop
+  } // end event loop
+  // ================================================================
+  cout << endl;
 
   for (auto& [name,h] : hists)
     for (auto& bin : *h)
