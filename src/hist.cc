@@ -188,5 +188,14 @@ int main(int argc, char* argv[]) {
     for (auto& bin : *h)
       bin.finalize();
 
-  std::ofstream(argv[1]) << nlohmann::json(hists) << '\n';
+  std::ofstream out(argv[1]);
+  if (ends_with(argv[1],".cbor")) {
+    auto cbor = nlohmann::json::to_cbor(hists);
+    out.write(
+      reinterpret_cast<const char*>(cbor.data()),
+      cbor.size() * sizeof(decltype(cbor[0]))
+    );
+  } else {
+    out << nlohmann::json(hists) << '\n';
+  }
 }
