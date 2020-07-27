@@ -13,6 +13,13 @@
 
 #include <fastjet/ClusterSequence.hh>
 
+#define STR1(x) #x
+#define STR(x) STR1(x)
+
+#define TEST(var) std::cout << \
+  "\033[33m" STR(__LINE__) ": " \
+  "\033[36m" #var ":\033[0m " << (var) << std::endl;
+
 #include "Higgs2diphoton.hh"
 #include "ivanp/error.hh"
 #include "ivanp/branch_reader.hh"
@@ -22,20 +29,17 @@
 #include "ivanp/hist/bins.hh"
 #include "ivanp/hist/json.hh"
 
-#define STR1(x) #x
-#define STR(x) STR1(x)
-
-#define TEST(var) std::cout << \
-  "\033[33m" STR(__LINE__) ": " \
-  "\033[36m" #var ":\033[0m " << (var) << std::endl;
-
 using std::cout;
 using std::endl;
 namespace fj = fastjet;
 using namespace ivanp;
 using namespace ivanp::map::operators;
 
-using hist_t = ivanp::hist::histogram<ivanp::hist::nlo_mc_multibin>;
+using hist_t = ivanp::hist::histogram<
+  ivanp::hist::nlo_mc_multibin,
+  std::vector<std::vector<ivanp::hist::list_axis<std::vector<double>>>>,
+  ivanp::hist::perbin_axes_spec<true>
+>;
 using bin_t = typename hist_t::bin_type;
 
 bool photon_eta_cut(double abs_eta) noexcept {
@@ -58,15 +62,23 @@ int main(int argc, char* argv[]) {
   hists[#NAME] = &h_##NAME;
 
   h_(pT_yy)
+  h_(yAbs_yy_vs_pT_yy)
 
   // TODO: read from punchcards
-  *hists["pT_yy"] = { {{
-    0, 5, 10, 15, 20, 25, 30, 35, 45, 60, 80, 100, 120, 140, 170, 200, 250,
-    350, 450, 1000
-  }} };
+  *hists["pT_yy"] = {{
+    { { 0, 5, 10, 15, 20, 25, 30, 35, 45, 60, 80, 100, 120, 140, 170, 200, 250,
+        350, 450, 1000 } }
+  }};
+  *hists["yAbs_yy_vs_pT_yy"] = {{
+    { { 0.0, 0.5, 1.0, 1.5, 2.5 } },
+    { { 0, 45, 120, 350 } }
+  }};
+
+  TEST(h_pT_yy.nbins())
+  TEST(h_yAbs_yy_vs_pT_yy.nbins())
 
   std::vector<fj::PseudoJet> partons, jets;
-  Higgs2diphoton higgs_decay;
+  Higgs2diphoton higgs_decay(1234);
   Higgs2diphoton::photons_type photons;
   TLorentzVector higgs;
 
@@ -155,7 +167,7 @@ int main(int argc, char* argv[]) {
         }), jets.end() );
       std::sort( jets.begin(), jets.end(), // sort by pT
         [](const auto& a, const auto& b){ return ( a.pt() > b.pt() ); });
-      const unsigned njets = jets.size(); // resulting number of jets
+      // const unsigned njets = jets.size(); // number of clustered jets
 
       // set weights ------------------------------------------------
       bin_t::weight[0] = *_weight2;
@@ -165,6 +177,9 @@ int main(int argc, char* argv[]) {
       const auto pT_yy = higgs.Pt();
       h_pT_yy(pT_yy);
 
+      const auto yAbs_yy = std::abs(higgs.Rapidity());
+      h_yAbs_yy_vs_pT_yy(yAbs_yy,pT_yy);
+
     } // end event loop
     // ==============================================================
   } // end file loop
@@ -173,5 +188,5 @@ int main(int argc, char* argv[]) {
     for (auto& bin : *h)
       bin.finalize();
 
-  std::ofstream(argv[1]) << nlohmann::json(hists);
+  std::ofstream(argv[1]) << nlohmann::json(hists) << '\n';
 }
