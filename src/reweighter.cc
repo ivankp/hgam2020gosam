@@ -284,8 +284,8 @@ unsigned reweighter::nweights() const {
 double reweighter::operator[](unsigned i) const {
   return impl->weights[i];
 }
-std::string reweighter::weight_name(unsigned i) const {
-  return impl->weights_names[i];
+const std::vector<std::string>& reweighter::weights_names() const {
+  return impl->weights_names;
 }
 
 decltype(reweighter_impl::scale_functions)

@@ -32,13 +32,23 @@
 #include "reweighter.hh"
 #include "Higgs2diphoton.hh"
 
+using namespace ivanp::map::operators;
+
+template <ivanp::map::Container C>
+decltype(auto) operator+=(std::vector<auto,auto>& v, C&& r) {
+  v.reserve(v.size()+ivanp::cont::size(r));
+  std::forward<C>(r) | [&]<typename T>(T&& x){
+    v.emplace_back(std::forward<T>(x));
+  };
+  return v;
+}
+
 using std::cout;
 using std::cerr;
 using std::endl;
 using nlohmann::json;
 namespace fj = fastjet;
 using namespace ivanp;
-using namespace ivanp::map::operators;
 
 using hist_t = ivanp::hist::histogram<
   ivanp::hist::nlo_mc_multibin,
@@ -95,8 +105,8 @@ int main(int argc, char* argv[]) {
     _pz(reader,"pz"),
     _E (reader,"E" );
   branch_reader<int[]> _kf(reader,"kf");
-  branch_reader<double> _weight2(reader,"weight2");
   branch_reader<double> _weight(reader,"weight");
+  branch_reader<double> _weight2(reader,"weight2");
 
   std::optional<branch_reader<int>> _ncount;
   for (auto* b : *reader.GetTree()->GetListOfBranches()) {
@@ -106,8 +116,21 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  std::vector<std::string> weights_names {
+    "weight", "weight2"
+  };
+
+  // Make reweighters
+  std::vector<reweighter> reweighters;
+  // auto reweighters = conf.at("reweighting") | [&](const auto& def){
+  //   return reweighter(reader,def);
+  // };
+
+  for (auto& rew : reweighters) // get weights names
+    weights_names += rew.weights_names();
+
   // weight vector needs to be resized before histograms are created
-  bin_t::weight.resize(2);
+  bin_t::weight.resize( weights_names.size() );
 
   // create histograms ----------------------------------------------
   std::map<const char*,hist_t*,chars_less> hists;
@@ -226,8 +249,8 @@ int main(int argc, char* argv[]) {
     const unsigned njets = jets.size(); // number of clustered jets
 
     // set weights --------------------------------------------------
-    bin_t::weight[0] = *_weight2;
-    bin_t::weight[1] = *_weight;
+    bin_t::weight[0] = *_weight;
+    bin_t::weight[1] = *_weight2;
 
     // Observables **************************************************
     const auto pT_yy = higgs.Pt();

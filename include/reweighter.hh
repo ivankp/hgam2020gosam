@@ -35,7 +35,7 @@ public:
   void operator()();
   unsigned nweights() const;
   double operator[](unsigned i) const;
-  std::string weight_name(unsigned i) const;
+  const std::vector<std::string>& weights_names() const;
 };
 
 #endif
