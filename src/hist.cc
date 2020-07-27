@@ -56,26 +56,51 @@ int main(int argc, char* argv[]) {
 
   bin_t::weight.resize(2);
 
-  std::map<std::string,hist_t*> hists;
+  std::map<const char*,hist_t*,chars_less> hists;
 #define h_(NAME) \
   hist_t h_##NAME; \
   hists[#NAME] = &h_##NAME;
 
-  h_(pT_yy)
-  h_(yAbs_yy_vs_pT_yy)
+#include ".build/punch.hh"
+  for (const char* card_name : cards_names) {
+    cout << card_name << '\n';
+    const auto file_name = cat("punchcards/",card_name,".punch");
+    auto get = [card=TEnv(file_name.c_str())]
+    (const auto& key, const auto& x0) -> decltype(auto) {
+      return card.GetValue(ivanp::cstr(key),x0);
+    };
 
-  // TODO: read from punchcards
-  *hists["pT_yy"] = {{
-    { { 0, 5, 10, 15, 20, 25, 30, 35, 45, 60, 80, 100, 120, 140, 170, 200, 250,
-        350, 450, 1000 } }
-  }};
-  *hists["yAbs_yy_vs_pT_yy"] = {{
-    { { 0.0, 0.5, 1.0, 1.5, 2.5 } },
-    { { 0, 45, 120, 350 } }
-  }};
+    hist_t::axes_type axes;
 
-  TEST(h_pT_yy.nbins())
-  TEST(h_yAbs_yy_vs_pT_yy.nbins())
+    std::string name, prefix;
+    for (int j=0; ; ++j) {
+      if (j>0) prefix = cat("Var",j,".");
+
+      name = get(prefix+"VarName","");
+      if (name.empty()) { if (j==0) continue; else break; }
+
+      auto& dim = axes.emplace_back();
+
+      auto binning = [&](const auto& suffix) {
+        const char* val = get(cat(prefix,"Binning",suffix),"");
+        if (*val=='\0') return false;
+        auto& edges = dim.emplace_back().edges();
+        std::stringstream ss(val);
+        for (double x; ss >> x;) edges.emplace_back(x);
+        if (edges.size()<2)
+          THROW("must provide Binning with at least 2 edges");
+        return true;
+      };
+      if (!binning(""))
+        for (int i=1; binning(i); ++i);
+
+      if (j==0) break;
+    }
+    if (axes.empty()) THROW("no binning in file \"",file_name,"\"");
+    auto& h = *hists[card_name] = std::move(axes);
+    cout << nlohmann::json(h.axes()) << '\n';
+  }
+  cout << endl;
 
   std::vector<fj::PseudoJet> partons, jets;
   Higgs2diphoton higgs_decay(1234);

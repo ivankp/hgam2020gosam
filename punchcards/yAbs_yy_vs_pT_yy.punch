@@ -1,0 +1,6 @@
+Var1.VarName: yAbs_yy
+Var1.Binning: 0.0 0.5 1.0 1.5 2.5
+
+Var2.VarName: pT_yy
+Var2.ScaleFactor: 1e3
+Var2.Binning: 0 45 120 350

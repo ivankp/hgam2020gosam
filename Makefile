@@ -29,10 +29,10 @@ all: bin/hist
 
 #####################################################################
 
-C_hist := $(ROOT_CPPFLAGS) $(FJ_CPPFLAGS) $(LHAPDF_CPPFLAGS)
+C_hist := $(ROOT_CPPFLAGS) $(FJ_CPPFLAGS) $(LHAPDF_CPPFLAGS) -I.
 LF_hist := $(ROOT_LDFLAGS)
 L_hist := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS)
-bin/hist: .build/Higgs2diphoton.o
+bin/hist: .build/Higgs2diphoton.o .build/punch.hh
 
 C_Higgs2diphoton := $(ROOT_CPPFLAGS)
 
@@ -47,6 +47,12 @@ bin/%: .build/%.o
 .build/%.o: src/%.cc
 	@mkdir -pv $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEPFLAGS) $(C_$*) -c $(filter %.cc,$^) -o $@
+
+.build/punch.hh: punchcards
+	@ls $< | sed 's/\.punch$$//;s/^.*/h_(&)/' > $@
+	@printf '\nstatic constexpr const char* cards_names[] {\n' >> $@
+	@sed -n 's/^h_(\(.*\))$$/  "\1",/p' $@ >> $@
+	@printf '};\n' >> $@
 
 -include $(shell find .build -type f -name '*.d' 2>/dev/null)
 
