@@ -3,13 +3,9 @@
 
 #include "Higgs2diphoton.hh"
 
-Higgs2diphoton::Higgs2diphoton()
-: gen(std::chrono::system_clock::now().time_since_epoch().count()),
-  phi_dist(0.,2*M_PI), cts_dist(-1.,1.)
-{ }
-
 Higgs2diphoton::Higgs2diphoton(seed_type seed)
-: gen(seed), phi_dist(0.,2*M_PI), cts_dist(-1.,1.)
+: gen(seed ?: std::chrono::system_clock::now().time_since_epoch().count()),
+  phi_dist(0.,2*M_PI), cts_dist(-1.,1.)
 { }
 
 Higgs2diphoton::photons_type

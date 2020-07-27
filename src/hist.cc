@@ -33,7 +33,9 @@
 #include "Higgs2diphoton.hh"
 
 using std::cout;
+using std::cerr;
 using std::endl;
+using nlohmann::json;
 namespace fj = fastjet;
 using namespace ivanp;
 using namespace ivanp::map::operators;
@@ -50,9 +52,58 @@ bool photon_eta_cut(double abs_eta) noexcept {
 }
 
 int main(int argc, char* argv[]) {
-  if (argc < 3) {
-    cout << "usage: " << argv[0] << " hists.json ntuple1.root ... \n";
+  if (argc < 4) {
+    cerr << "usage: " << argv[0] <<
+      " config.json hists.json ntuple1.root ... \n";
     return 1;
+  }
+
+  const auto conf = json::parse(std::ifstream(argv[1]));
+  cout << conf.dump(2) <<'\n'<< endl;
+
+  // Chain input files
+  std::unique_ptr<TChain> chain;
+  { auto file = std::make_unique<TFile>(argv[3]);
+    TTree* tree = nullptr;
+    for (auto* _key : *file->GetListOfKeys()) {
+      auto* key = static_cast<TKey*>(_key);
+      const auto* key_class = TClass::GetClass(key->GetClassName(),true);
+      if (!key_class) continue;
+      if (key_class->InheritsFrom(TTree::Class())) {
+        if (!tree)
+          tree = dynamic_cast<TTree*>(key->ReadObj());
+        else THROW("multiple trees in file \"",file->GetName(),"\"");
+      }
+    }
+    chain = std::make_unique<TChain>(tree->GetName());
+    cout << "Tree name: " << chain->GetName() << '\n';
+  }
+  for (int i=3; i<argc; ++i) {
+    cout << argv[i] << endl;
+    if (!chain->Add(argv[i],0)) THROW("failed to add file to chain");
+  }
+  cout << endl;
+
+  // Read branches
+  TTreeReader reader(&*chain);
+  branch_reader<int>
+    _id(reader,"id"),
+    _nparticle(reader,"nparticle");
+  branch_reader<double[],float[]>
+    _px(reader,"px"),
+    _py(reader,"py"),
+    _pz(reader,"pz"),
+    _E (reader,"E" );
+  branch_reader<int[]> _kf(reader,"kf");
+  branch_reader<double> _weight2(reader,"weight2");
+  branch_reader<double> _weight(reader,"weight");
+
+  std::optional<branch_reader<int>> _ncount;
+  for (auto* b : *reader.GetTree()->GetListOfBranches()) {
+    if (!strcmp(b->GetName(),"ncount")) {
+      _ncount.emplace(reader,"ncount");
+      break;
+    }
   }
 
   // weight vector needs to be resized before histograms are created
@@ -66,7 +117,7 @@ int main(int argc, char* argv[]) {
 
 #include ".build/punch.hh" // defines cards_names
 
-  // read histograms binning
+  // read histograms' binning
   for (const char* card_name : cards_names) {
     cout << card_name << '\n';
     const auto file_name = cat("punchcards/",card_name,".punch");
@@ -103,65 +154,25 @@ int main(int argc, char* argv[]) {
     }
     if (axes.empty()) THROW("no binning in file \"",file_name,"\"");
     auto& h = *hists[card_name] = hist_t(std::move(axes));
-    cout << nlohmann::json(h.axes()) << '\n';
+    cout << json(h.axes()) << '\n';
   }
   cout << endl;
-
-  // Chain input files
-  std::unique_ptr<TChain> chain;
-  { auto file = std::make_unique<TFile>(argv[2]);
-    TTree* tree = nullptr;
-    for (auto* _key : *file->GetListOfKeys()) {
-      auto* key = static_cast<TKey*>(_key);
-      const auto* key_class = TClass::GetClass(key->GetClassName(),true);
-      if (!key_class) continue;
-      if (key_class->InheritsFrom(TTree::Class())) {
-        if (!tree)
-          tree = dynamic_cast<TTree*>(key->ReadObj());
-        else THROW("multiple trees in file \"",file->GetName(),"\"");
-      }
-    }
-    chain = std::make_unique<TChain>(tree->GetName());
-    cout << "Tree name: " << chain->GetName() << '\n';
-  }
-  for (int i=2; i<argc; ++i) {
-    cout << argv[i] << endl;
-    if (!chain->Add(argv[i],0)) THROW("failed to add file to chain");
-  }
-  cout << endl;
-
-  // Read branches
-  TTreeReader reader(&*chain);
-  branch_reader<int>
-    _id(reader,"id"),
-    _nparticle(reader,"nparticle");
-  branch_reader<double[],float[]>
-    _px(reader,"px"),
-    _py(reader,"py"),
-    _pz(reader,"pz"),
-    _E (reader,"E" );
-  branch_reader<int[]> _kf(reader,"kf");
-  branch_reader<double> _weight2(reader,"weight2");
-  branch_reader<double> _weight(reader,"weight");
-
-  std::optional<branch_reader<int>> _ncount;
-  for (auto* b : *reader.GetTree()->GetListOfBranches()) {
-    if (!strcmp(b->GetName(),"ncount")) {
-      _ncount.emplace(reader,"ncount");
-      break;
-    }
-  }
 
   std::vector<fj::PseudoJet> partons, jets;
-  Higgs2diphoton higgs_decay(1234);
+  Higgs2diphoton higgs_decay(
+    conf.value("higgs_decay_seed",Higgs2diphoton::seed_type(0)));
   Higgs2diphoton::photons_type photons;
   TLorentzVector higgs;
 
-  const fj::JetDefinition jet_def(fj::antikt_algorithm,0.4);
+  const fj::JetDefinition jet_def(
+    fj::antikt_algorithm, conf.value("jet_dR",0.4) );
   fj::ClusterSequence::print_banner(); // get it out of the way
   cout << jet_def.description() << endl;
 
-  const double jet_pt_cut = 30., jet_eta_cut = 4.4;
+  const double
+    jet_pt_cut = conf.value("jet_pt_cut",30.),
+    jet_eta_cut = conf.value("jet_eta_cut",4.4);
+  const bool apply_photon_cuts = conf.value("apply_photon_cuts",true);
 
   cout << endl;
 
@@ -187,7 +198,6 @@ int main(int argc, char* argv[]) {
 
     // H -> γγ ----------------------------------------------------
     photons = higgs_decay(higgs,new_id);
-
     auto A_pT = photons | [](const auto& p){ return p.Pt(); };
     if (A_pT[0] < A_pT[1]) {
       std::swap(A_pT[0],A_pT[1]);
@@ -195,13 +205,12 @@ int main(int argc, char* argv[]) {
     }
     const auto A_eta = photons | [](const auto& p){ return p.Eta(); };
 
-    // Photon cuts --------------------------------------------------
-    if (
+    if (apply_photon_cuts && (
       (A_pT[0] < 0.35*125.) or
       (A_pT[1] < 0.25*125.) or
       photon_eta_cut(std::abs(A_eta[0])) or
       photon_eta_cut(std::abs(A_eta[1]))
-    ) continue;
+    )) continue;
 
     // Jets ---------------------------------------------------------
     jets = fj::ClusterSequence(partons,jet_def)
@@ -237,14 +246,14 @@ int main(int argc, char* argv[]) {
     for (auto& bin : *h)
       bin.finalize();
 
-  std::ofstream out(argv[1]);
-  if (ends_with(argv[1],".cbor")) {
-    auto cbor = nlohmann::json::to_cbor(hists);
+  std::ofstream out(argv[2]);
+  if (ends_with(argv[2],".cbor")) {
+    auto cbor = json::to_cbor(hists);
     out.write(
       reinterpret_cast<const char*>(cbor.data()),
       cbor.size() * sizeof(decltype(cbor[0]))
     );
   } else {
-    out << nlohmann::json(hists) << '\n';
+    out << json(hists) << '\n';
   }
 }

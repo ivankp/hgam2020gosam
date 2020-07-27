@@ -29,7 +29,7 @@ all: bin/hist
 
 #####################################################################
 
-C_hist := $(ROOT_CPPFLAGS) $(FJ_CPPFLAGS) $(LHAPDF_CPPFLAGS) -I.
+C_hist := $(ROOT_CPPFLAGS) $(FJ_CPPFLAGS) $(LHAPDF_CPPFLAGS) -I. -DNDEBUG
 LF_hist := $(ROOT_LDFLAGS)
 L_hist := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS)
 bin/hist: .build/reweighter.o .build/Higgs2diphoton.o .build/punch.hh

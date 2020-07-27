@@ -17,7 +17,7 @@ public:
   Higgs2diphoton();
 
   using seed_type = typename decltype(gen)::result_type;
-  Higgs2diphoton(seed_type seed);
+  Higgs2diphoton(seed_type seed = 0);
 
   using photons_type = std::array<TLorentzVector,2>;
 
