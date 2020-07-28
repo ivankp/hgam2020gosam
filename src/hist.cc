@@ -30,6 +30,7 @@
 #include "ivanp/hist/json.hh"
 
 #include "reweighter.hh"
+#include "reweighter_json.hh"
 #include "Higgs2diphoton.hh"
 
 using namespace ivanp::map::operators;
@@ -57,6 +58,14 @@ using hist_t = ivanp::hist::histogram<
 >;
 using bin_t = typename hist_t::bin_type;
 
+std::vector<std::string> weights_names;
+template <>
+struct ivanp::hist::bin_def<bin_t> {
+  static nlohmann::json def() {
+    return { weights_names, "n", "nent" };
+  }
+};
+
 bool photon_eta_cut(double abs_eta) noexcept {
   return (1.37 < abs_eta && abs_eta < 1.52) || (2.37 < abs_eta);
 }
@@ -69,13 +78,13 @@ int main(int argc, char* argv[]) {
   }
 
   const auto conf = json::parse(std::ifstream(argv[1]));
-  cout << conf.dump(2) <<'\n'<< endl;
+  cout << conf/*.dump(2)*/ <<'\n'<< endl;
 
   // Chain input files
   std::unique_ptr<TChain> chain;
   { auto file = std::make_unique<TFile>(argv[3]);
     TTree* tree = nullptr;
-    for (auto* _key : *file->GetListOfKeys()) {
+    for (auto* _key : *file->GetListOfKeys()) { // find TTree
       auto* key = static_cast<TKey*>(_key);
       const auto* key_class = TClass::GetClass(key->GetClassName(),true);
       if (!key_class) continue;
@@ -116,18 +125,15 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  std::vector<std::string> weights_names {
-    "weight", "weight2"
-  };
+  weights_names = { "weight", "weight2" };
 
   // Make reweighters
-  std::vector<reweighter> reweighters;
-  // auto reweighters = conf.at("reweighting") | [&](const auto& def){
-  //   return reweighter(reader,def);
-  // };
-
-  for (auto& rew : reweighters) // get weights names
+  auto reweighters = conf.at("reweighting") | [&](const auto& def){
+    reweighter rew(reader,def);
     weights_names += rew.weights_names();
+    return rew;
+  };
+  cout << endl;
 
   // weight vector needs to be resized before histograms are created
   bin_t::weight.resize( weights_names.size() );
@@ -252,6 +258,12 @@ int main(int argc, char* argv[]) {
     bin_t::weight[0] = *_weight;
     bin_t::weight[1] = *_weight2;
 
+    for (auto& rew : reweighters) {
+      rew(); // reweight this event
+      for (unsigned i=0, n=rew.nweights(); i<n; ++i)
+        bin_t::weight[i+2] = rew[i];
+    }
+
     // Observables **************************************************
     const auto pT_yy = higgs.Pt();
     h_pT_yy(pT_yy);
@@ -265,10 +277,12 @@ int main(int argc, char* argv[]) {
   // ================================================================
   cout << endl;
 
+  // finalize bins
   for (auto& [name,h] : hists)
     for (auto& bin : *h)
       bin.finalize();
 
+  // write output file
   std::ofstream out(argv[2]);
   if (ends_with(argv[2],".cbor")) {
     auto cbor = json::to_cbor(hists);

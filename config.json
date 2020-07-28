@@ -1,7 +1,13 @@
-{
-  "higgs_decay_seed": 1234,
+{ "higgs_decay_seed": 1234,
   "apply_photon_cuts": true,
   "jet_pt_cut": 30,
   "jet_eta_cut": 4.4,
-  "jet_dR": 0.4
+  "jet_dR": 0.4,
+  "reweighting": [
+    { "pdf": "CT14nlo",
+      "pdf_var": true,
+      "scale": "HT1",
+      "ren_fac": [ [1,1],[0.5,0.5],[1,0.5],[0.5,1],[2,1],[1,2],[2,2] ]
+    }
+  ]
 }
