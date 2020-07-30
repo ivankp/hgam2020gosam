@@ -10,20 +10,9 @@ loc = os.path.abspath(os.path.join(
 
 chunk_size = 50e6
 
-config = {
-  "higgs_decay_seed": 0,
-  "apply_photon_cuts": True,
-  "jet_pt_cut": 30,
-  "jet_eta_cut": 4.4,
-  "jet_dR": 0.4,
-  "reweighting": [
-    { "pdf": "CT14nlo",
-      "pdf_var": True,
-      "scale": "HT1",
-      "ren_fac": [ [1,1],[0.5,0.5],[1,0.5],[0.5,1],[2,1],[1,2],[2,2] ]
-    }
-  ]
-}
+with open(loc+'/config.json') as f:
+    config = json.load(f)
+config['higgs_decay_seed'] = 0 # use time as seed
 
 db = sqlite3.connect('/home/ivanp/work/ntuple_analysis/sql/ntuples.db')
 
