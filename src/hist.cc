@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
       _ncount.emplace(reader,"ncount");
       break;
     }
-  }
+  } // TODO: use ncount
 
   weights_names = { "weight", "weight2" };
 

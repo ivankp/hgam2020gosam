@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 import sys
-if len(sys.argv)!=3:
-    print("usage:",sys.argv[0],"in.cbor out.cbor")
+if len(sys.argv)<3:
+    print("usage:",sys.argv[0],"in.cbor out.json [weights ...]")
     sys.exit(1)
 print(sys.argv[1]+' -> '+sys.argv[2])
 
 from cbor import cbor
-import re
+import json, re, math
 from collections import defaultdict
 
 with open(sys.argv[1],'rb') as f:
@@ -47,6 +47,7 @@ for name, s in sets.items():
 hf['bins'] = [ w for w,i in indep ] + list(sets.keys())
 
 print()
+# make envelopes
 for hname, h in hf["hists"].items():
     print(hname)
     for hbin in h['bins'][1]:
@@ -55,7 +56,8 @@ for hname, h in hf["hists"].items():
         for s in sets.values():
             w = ws1[s.scale[0]]
             ws2.append([
-                *w,
+                w[0],
+                math.sqrt(w[1]),
                 [ min(ws1[i][0] for i in s.scale)-w[0],
                   max(ws1[i][0] for i in s.scale)-w[0] ],
                 [ min(ws1[i][0] for i in s.pdf)-w[0],
@@ -63,6 +65,47 @@ for hname, h in hf["hists"].items():
             ])
         hbin[0] = ws2
 
-with open(sys.argv[2],'wb') as f:
-    cbor.dump(hf,f)
+def subaxes(dim,n):
+    for axis in dim:
+        yield axis
+    for i in range(n-len(dim)):
+        yield dim[-1]
+
+def overflow(axes):
+    o = [ False ]
+    for dim in axes:
+        for i,axis in enumerate(subaxes(dim,len(o))):
+            o[i] = [True] + [o[i]] * (len(axis)-1) + [True]
+        o = [ item for sublist in o for item in sublist ]
+    return o
+
+def mask_list(xs,mask):
+    for x,f in zip(xs,mask):
+        if not f:
+            yield x
+
+# change structure & remove overflow bins
+out = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+for k,wname in enumerate(hf['bins']):
+    if len(sys.argv)>3:
+        if wname not in sys.argv[3:]:
+            continue
+    for hname, h in hf["hists"].items():
+        hout = out[wname][hname]
+        axes = hout['axes'] \
+             = [ [ hf['axes'][i] for i in ii ] for ii in h['axes'] ]
+        for y in mask_list( h['bins'][1], overflow(axes) ):
+            y = y[0][k]
+            # print(y)
+            for y,yname in zip(y,('xsec','mc_unc','scale','pdf')):
+                # print(yname,y)
+                hout[yname].append(y)
+
+with open(sys.argv[2],'w') as f:
+    # json.dump(out,f,separators=(',',':'))
+    jstr = json.dumps(out,indent=2)
+    jstr = re.sub(r'(\d,|\[)\s+',r'\1',jstr)
+    jstr = re.sub(r'\s+\]',r']',jstr)
+    jstr = re.sub(r'\],\s+\[',r'],[',jstr)
+    f.write(jstr)
 
