@@ -23,6 +23,9 @@ for fname in sys.argv[2:]:
         out = hf
         continue
 
+    for n in ('entries','events','count'):
+        out['N'][n] += hf['N'][n]
+
     if hf["axes"]!=out["axes"]:
         raise ValueError("incompatible axes definitions in "+fname)
     if hf["bins"]!=out["bins"]:
@@ -32,9 +35,11 @@ for fname in sys.argv[2:]:
         # print(hname)
         hout = out["hists"][hname]
         if h["axes"]!=hout["axes"]:
-            raise ValueError("incompatible axes definitions for "+hname+" in "+fname)
+            raise ValueError(
+                "incompatible axes definitions for "+hname+" in "+fname)
         if h["bins"][0]!=hout["bins"][0]:
-            raise ValueError("incompatible bins definitions for "+hname+" in "+fname)
+            raise ValueError(
+                "incompatible bins definitions for "+hname+" in "+fname)
 
         sum_lists(hout["bins"][1],h["bins"][1])
 

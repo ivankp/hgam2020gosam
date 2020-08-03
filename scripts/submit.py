@@ -85,6 +85,7 @@ Output     = {0}.out
 Error      = {0}.err
 Log        = {0}.log
 getenv = True
++IsMediumJob = True
 Queue
 '''.format(chunk[0])
 

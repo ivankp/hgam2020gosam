@@ -113,7 +113,6 @@ int main(int argc, char* argv[]) {
     _pz(reader,"pz"),
     _E (reader,"E" );
   branch_reader<int[]> _kf(reader,"kf");
-  branch_reader<double> _weight(reader,"weight");
   branch_reader<double> _weight2(reader,"weight2");
 
   std::optional<branch_reader<int>> _ncount;
@@ -122,9 +121,9 @@ int main(int argc, char* argv[]) {
       _ncount.emplace(reader,"ncount");
       break;
     }
-  } // TODO: use ncount
+  }
 
-  weights_names = { "weight", "weight2" };
+  weights_names = { "weight2" };
 
   // Make reweighters
   auto reweighters = conf.at("reweighting") | [&](const auto& def){
@@ -204,11 +203,19 @@ int main(int argc, char* argv[]) {
 
   cout << endl;
 
+  bin_t::id = -1; // so that first entry has new id
+  long unsigned Ncount = 0, Nevents = 0, Nentries = 0;
+
   // EVENT LOOP =====================================================
   for (timed_counter cnt(reader.GetEntries()); reader.Next(); ++cnt) {
     const bool new_id = [id=*_id]{
       return (bin_t::id != id) ? ((bin_t::id = id),true) : false;
     }();
+    if (new_id) {
+      Ncount += (_ncount ? **_ncount : 1);
+      ++Nevents;
+    }
+    ++Nentries;
 
     // read 4-momenta -----------------------------------------------
     partons.clear();
@@ -254,13 +261,12 @@ int main(int argc, char* argv[]) {
     const unsigned njets = jets.size(); // number of clustered jets
 
     // set weights --------------------------------------------------
-    bin_t::weight[0] = *_weight;
-    bin_t::weight[1] = *_weight2;
+    bin_t::weight[0] = *_weight2;
 
     for (auto& rew : reweighters) {
       rew(); // reweight this event
       for (unsigned i=0, n=rew.nweights(); i<n; ++i)
-        bin_t::weight[i+2] = rew[i];
+        bin_t::weight[i+1] = rew[i];
     }
 
     // Observables **************************************************
@@ -282,14 +288,21 @@ int main(int argc, char* argv[]) {
       bin.finalize();
 
   // write output file
-  std::ofstream out(argv[2]);
-  if (ends_with(argv[2],".cbor")) {
-    auto cbor = json::to_cbor(hists);
-    out.write(
-      reinterpret_cast<const char*>(cbor.data()),
-      cbor.size() * sizeof(decltype(cbor[0]))
-    );
-  } else {
-    out << json(hists) << '\n';
+  { std::ofstream out(argv[2]);
+    json jhists(hists);
+    jhists["N"] = {
+      {"entries",Nentries},
+      {"events",Nevents},
+      {"count",Ncount}
+    };
+    if (ends_with(argv[2],".cbor")) {
+      auto cbor = json::to_cbor(jhists);
+      out.write(
+        reinterpret_cast<const char*>(cbor.data()),
+        cbor.size() * sizeof(decltype(cbor[0]))
+      );
+    } else {
+      out << jhists << '\n';
+    }
   }
 }
