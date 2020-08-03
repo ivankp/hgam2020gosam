@@ -1,12 +1,14 @@
 #!/bin/bash
 
+mkdir -p output/merged
+
 echo "merging parts"
 find output/jobs -type f -name '*.cbor' |
 sed 's/_[0-9]\+\.cbor$//' |
 sort -u |
 while read x
 do
-  out="$(sed 's:/jobs/:/:' <<< "$x").cbor"
+  out="$(sed 's:/jobs/:/merged/:' <<< "$x").cbor"
   echo $out
   need=false
   if [ -f "$out" ]; then
@@ -28,7 +30,7 @@ done
 
 echo
 echo "merging NLO"
-find output -maxdepth 1 -type f -name '*.cbor' |
+find output/merged -maxdepth 1 -type f -name '*.cbor' |
 sed -r 's/\.cbor$//;s/^([^_]*)(B|RS|I|V)_/\1NLO_/' |
 sort -u |
 while read x
@@ -52,3 +54,18 @@ do
     echo
   fi
 done
+
+mkdir -p output/envelopes
+
+echo
+echo "envelopes"
+find output/merged -maxdepth 1 -type f -name '*.cbor' |
+sort -u |
+while read x
+do
+  out="$(sed 's:/merged/:/envelopes/:;s:\.cbor$:.json:' <<< "$x")"
+  if [ ! -f "$out" ] || [ "$x" -nt "$out" ]; then
+    scripts/envelopes.py "$x" "$out" # 'HT1 CT14nlo'
+  fi
+done
+

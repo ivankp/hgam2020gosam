@@ -39,17 +39,17 @@ for i, weight in enumerate(hf["bins"][0][0]):
     # print(g)
     sets[g[0]](i,int(g[1]),float(g[2]),float(g[3]))
 
-for name, s in sets.items():
-    print(name)
-    print(s.scale)
-    print(s.pdf)
+# for name, s in sets.items():
+#     print(name)
+#     print(s.scale)
+#     print(s.pdf)
 
 hf['bins'] = [ w for w,i in indep ] + list(sets.keys())
 
-print()
+# print()
 # make envelopes
 for hname, h in hf["hists"].items():
-    print(hname)
+    # print(hname)
     for hbin in h['bins'][1]:
         ws1 = hbin[0]
         ws2 = [ ws1[i] for w,i in indep ]
