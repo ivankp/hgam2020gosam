@@ -1,0 +1,4 @@
+VarName: Dphi_j_j_30_signed
+Binning: -100. -3.15 -1.5708 0 1.5708 3.15
+
+AdditionalWeights: weightJvt_30

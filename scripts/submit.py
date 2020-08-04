@@ -64,6 +64,7 @@ LD_LIBRARY_PATH = os.environ['LD_LIBRARY_PATH']
 
 def condor(chunk):
     script = loc+'/condor/'+chunk[0]+'.sh'
+    config['njets_min'] = chunk[3]
     with open(script,'w') as f:
         f.write('''\
 #!/bin/bash

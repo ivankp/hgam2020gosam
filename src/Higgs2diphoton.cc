@@ -9,30 +9,27 @@ Higgs2diphoton::Higgs2diphoton(seed_type seed)
 { }
 
 Higgs2diphoton::photons_type
-Higgs2diphoton::operator()(const TLorentzVector& Higgs, bool new_kin) {
+Higgs2diphoton::operator()(const vec_t& Higgs, bool new_kin) {
   if (new_kin) {
-    phi = phi_dist(gen);
-    cts = cts_dist(gen);
+    const double phi = phi_dist(gen);
+    const double cts = cts_dist(gen);
 
-    sts = std::sin(std::acos(cts));
-    cos_phi = std::cos(phi);
-    sin_phi = std::sin(phi);
+    const double sts = std::sin(std::acos(cts));
+    const double cos_phi = std::cos(phi);
+    const double sin_phi = std::sin(phi);
+
+    photon = { cos_phi*sts, sin_phi*sts, cts };
   }
 
-  const double E  = Higgs.M()/2;
-  const TVector3 boost = Higgs.BoostVector();
+  const double E = Higgs.m()/2;
+  const auto boost = Higgs.boost_vector();
 
-  TVector3 photon( cos_phi*sts, sin_phi*sts, cts );
-  if (boost.Mag()!=0.) {
-    TVector3 axis = boost;
-    axis.SetMag(1.);
-    photon.RotateUz(axis);
-  }
-  photon *= E;
+  auto new_photon = photon;
+  new_photon.rotate_u_z(boost.normalized()) *= E;
 
   photons_type diphoton {{ {photon,E}, {-photon,E} }};
-  std::get<0>(diphoton).Boost(boost);
-  std::get<1>(diphoton).Boost(boost);
+  std::get<0>(diphoton) >> boost;
+  std::get<1>(diphoton) >> boost;
 
   return diphoton;
 }

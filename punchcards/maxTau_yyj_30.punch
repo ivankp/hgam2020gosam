@@ -1,0 +1,5 @@
+VarName: maxTau_yyj_30
+ScaleFactor: 1e3
+Binning: -100 0 5 15 25 40 400
+
+AdditionalWeights: weightJvt_30

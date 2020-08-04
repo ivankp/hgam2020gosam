@@ -9,7 +9,6 @@
 #include <TKey.h>
 #include <TChain.h>
 #include <TEnv.h>
-#include <TLorentzVector.h>
 
 #include <fastjet/ClusterSequence.hh>
 
@@ -21,9 +20,10 @@
   "\033[36m" #var ":\033[0m " << (var) << std::endl;
 
 #include "ivanp/error.hh"
-#include "ivanp/branch_reader.hh"
 #include "ivanp/enumerate.hh"
 #include "ivanp/timed_counter.hh"
+#include "ivanp/branch_reader.hh"
+#include "ivanp/vec4.hh"
 #include "ivanp/hist/histograms.hh"
 #include "ivanp/hist/bins.hh"
 #include "ivanp/hist/json.hh"
@@ -185,11 +185,12 @@ int main(int argc, char* argv[]) {
   }
   cout << endl;
 
-  std::vector<fj::PseudoJet> partons, jets;
+  std::vector<fj::PseudoJet> partons;
+  std::vector<vec4> jets;
   Higgs2diphoton higgs_decay(
     conf.value("higgs_decay_seed",Higgs2diphoton::seed_type(0)));
   Higgs2diphoton::photons_type photons;
-  TLorentzVector higgs;
+  vec4 higgs;
 
   const fj::JetDefinition jet_def(
     fj::antikt_algorithm, conf.value("jet_dR",0.4) );
@@ -199,6 +200,7 @@ int main(int argc, char* argv[]) {
   const double
     jet_pt_cut = conf.value("jet_pt_cut",30.),
     jet_eta_cut = conf.value("jet_eta_cut",4.4);
+  const unsigned njets_min = conf.value("njets_min",0u);
   const bool apply_photon_cuts = conf.value("apply_photon_cuts",true);
 
   cout << endl;
@@ -223,7 +225,7 @@ int main(int argc, char* argv[]) {
     bool got_higgs = false;
     for (unsigned i=0; i<np; ++i) {
       if (_kf[i] == 25) {
-        higgs.SetPxPyPzE(_px[i],_py[i],_pz[i],_E[i]);
+        higgs = { _px[i],_py[i],_pz[i],_E[i] };
         got_higgs = true;
       } else {
         partons.emplace_back(_px[i],_py[i],_pz[i],_E[i]);
@@ -233,12 +235,12 @@ int main(int argc, char* argv[]) {
 
     // H -> γγ ----------------------------------------------------
     photons = higgs_decay(higgs,new_id);
-    auto A_pT = photons | [](const auto& p){ return p.Pt(); };
+    auto A_pT = photons | [](const auto& p){ return p.pt(); };
     if (A_pT[0] < A_pT[1]) {
       std::swap(A_pT[0],A_pT[1]);
       std::swap(photons[0],photons[1]);
     }
-    const auto A_eta = photons | [](const auto& p){ return p.Eta(); };
+    const auto A_eta = photons | [](const auto& p){ return p.eta(); };
 
     if (apply_photon_cuts && (
       (A_pT[0] < 0.35*125.) or
@@ -249,7 +251,8 @@ int main(int argc, char* argv[]) {
 
     // Jets ---------------------------------------------------------
     jets = fj::ClusterSequence(partons,jet_def)
-          .inclusive_jets(); // get clustered jets
+          .inclusive_jets() // get clustered jets
+          | [](const auto& j){ return vec4(j); };
 
     jets.erase( std::remove_if( jets.begin(), jets.end(), // apply jet cuts
       [=](const auto& jet){
@@ -270,13 +273,68 @@ int main(int argc, char* argv[]) {
     }
 
     // Observables **************************************************
-    const auto pT_yy = higgs.Pt();
-    h_pT_yy(pT_yy);
-
-    const auto yAbs_yy = std::abs(higgs.Rapidity());
-    h_yAbs_yy_vs_pT_yy(yAbs_yy,pT_yy);
 
     h_N_j_30(njets);
+
+    if (njets < njets_min) continue; // require minimum number of jets
+
+    h_isPassed(1);
+
+    const auto pT_yy = higgs.pt();
+    h_pT_yy(pT_yy);
+    h_pT_yy_650(pT_yy);
+
+    const auto yAbs_yy = std::abs(higgs.rap());
+    h_yAbs_yy(yAbs_yy);
+    h_yAbs_yy_vs_pT_yy(yAbs_yy,pT_yy);
+
+    // rel_pT_y1.punch
+    // rel_pT_y2.punch
+    // rel_sumpT_y_y_vs_rel_DpT_y_y.punch
+
+    if (njets<1) continue; // =======================================
+
+    const auto jet_pt = jets | [](const auto& jet){ return jet.pt(); };
+    const auto pT_j1 = jet_pt[0];
+    h_pT_j1_30(pT_j1);
+
+    const auto yyj = higgs + jets[0];
+    const auto pT_yyj = yyj.pt();
+    h_pT_yyj_30(pT_yyj);
+    h_pT_yyj_30_vs_pT_yy(pT_yyj,pT_yy);
+
+    h_m_yyj_30(yyj.m());
+
+    if (pT_j1 >= 30) {
+      h_pT_yy_JV_30(pT_yy);
+    if (pT_j1 >= 40) {
+      h_pT_yy_JV_40(pT_yy);
+    if (pT_j1 >= 50) {
+      h_pT_yy_JV_50(pT_yy);
+    if (pT_j1 >= 60) {
+      h_pT_yy_JV_60(pT_yy);
+    }}}}
+
+    double HT = 0;
+    for (double pt : jet_pt) HT += pt;
+    h_HT_30(HT);
+
+    // Dphi_j_j_30.punch
+    // Dphi_j_j_30_signed.punch
+
+    // maxTau_yyj_30.punch
+    // maxTau_yyj_30_vs_pT_yy.punch
+    // sumTau_yyj_30.punch
+
+    if (njets<2) continue; // =======================================
+
+    const auto jj = jets[0] + jets[1];
+    h_m_jj_30(jj.m());
+
+    const auto yyjj = higgs + jj;
+    h_pT_yyjj_30(yyjj.pt());
+
+    // Dphi_yy_jj_30.punch
 
   } // end event loop
   // ================================================================

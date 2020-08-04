@@ -1,0 +1,7 @@
+Var1.VarName: rel_sumpT_y_y
+Var1.Binning: 0.6 0.8 1.1 4
+
+Var2.VarName: rel_DpT_y_y
+Var2.Binning1: 0 0.3
+Var2.Binning2: 0 0.05 0.1 0.2 0.8
+Var2.Binning3: 0 0.3 0.6 4

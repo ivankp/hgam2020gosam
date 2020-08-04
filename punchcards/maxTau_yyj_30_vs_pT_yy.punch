@@ -1,0 +1,13 @@
+Var1.VarName: maxTau_yyj_30
+Var1.ScaleFactor: 1e3
+Var1.Binning: -100 0 15 25 40 400
+
+Var2.VarName: pT_yy
+Var2.ScaleFactor: 1e3
+Var2.Binning1: 0 350
+Var2.Binning2: 0 45 120 350
+Var2.Binning3: 0 120 350
+Var2.Binning4: 0 120 350
+Var2.Binning5: 0 200 350
+
+AdditionalWeights: weightJvt_30

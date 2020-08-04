@@ -1,0 +1,5 @@
+VarName: m_yyj_30
+ScaleFactor: 1e3
+Binning: -100 120 180 220 300 400 600 900 2000
+
+AdditionalWeights: weightJvt_30

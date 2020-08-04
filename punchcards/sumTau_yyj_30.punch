@@ -1,0 +1,5 @@
+VarName: sumTau_yyj_30
+ScaleFactor: 1e3
+Binning: -100 5 15 25 40 80 400
+
+AdditionalWeights: weightJvt_30

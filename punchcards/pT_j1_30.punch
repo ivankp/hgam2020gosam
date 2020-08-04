@@ -1,0 +1,5 @@
+VarName: pT_j1_30
+ScaleFactor: 1e3
+Binning: -100 30 60 90 120 350 999
+
+AdditionalWeights: weightJvt_30

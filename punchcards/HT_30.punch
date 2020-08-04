@@ -1,0 +1,5 @@
+VarName: HT_30
+ScaleFactor: 1e3
+Binning: -100 30 70 140 200 500 999
+
+AdditionalWeights: weightJvt_30
