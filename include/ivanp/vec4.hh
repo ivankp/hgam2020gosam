@@ -2,12 +2,22 @@
 #define IVANP_VEC4_HH
 
 #include <cmath>
-#include "ivanp/math.hh"
+#include <algorithm>
+#include <numbers>
 
 namespace ivanp {
+
+inline constexpr double pi = std::numbers::pi;
+inline constexpr double twopi = pi*2;
+
+template <typename... T>
+[[ gnu::always_inline ]]
+constexpr auto sq(const T&... x) noexcept { return (... + (x*x)); }
+
 struct vec3;
 struct vec4;
-}
+
+} // end namespace ivanp
 
 namespace std {
 
@@ -19,7 +29,7 @@ struct tuple_element<I,ivanp::vec3> { using type = double; };
 template <size_t I> requires(I<4)
 struct tuple_element<I,ivanp::vec4> { using type = double; };
 
-}
+} // end namespace std
 
 namespace ivanp {
 
@@ -143,6 +153,8 @@ constexpr double operator*(const vec3& a, const vec3& b) noexcept
 constexpr vec3 operator*(const vec3& a, double b) noexcept
 { return { a[0]*b, a[1]*b, a[2]*b }; }
 constexpr vec3 operator*(double b, const vec3& a) noexcept { return a*b; }
+
+// ==================================================================
 
 struct vec4 {
   union {
@@ -284,6 +296,49 @@ constexpr vec4 operator*(double b, const vec4& a) noexcept { return a*b; }
 inline vec4& operator>>(vec4& a, const vec3& b) noexcept
 { return a.boost(b); }
 
+// free functions ---------------------------------------------------
+
+inline double tau(const vec4& jet, double higgs_y) noexcept {
+  return std::sqrt( sq(jet[3])-sq(jet[2]) )
+       / ( std::cosh(jet.rap()-higgs_y)*2 );
 }
+inline double pTt(const vec4& a, const vec4& b) noexcept {
+  return std::abs( a[0]*b[1]-b[0]*a[1] )
+       / ( std::sqrt(sq(a[0]+b[0],a[1]+b[1]))*2 );
+}
+
+inline double dphi(double phi1, double phi2) noexcept {
+  double _dphi = phi1 - phi2;
+  if (_dphi < 0.) [[unlikely]] _dphi = -_dphi;
+  if (_dphi > pi) [[unlikely]]
+    return twopi - _dphi;
+  else
+    return _dphi;
+}
+inline double dphi(const vec4& a, const vec4& b) noexcept {
+  return dphi(a.phi(),b.phi());
+}
+
+inline double dphi_signed(double phi1, double phi2, double rap1, double rap2)
+noexcept {
+  double _dphi = phi1 - phi2;
+  if (rap1 < rap2) _dphi = -_dphi;
+  while (_dphi >= pi) _dphi -= twopi;
+  while (_dphi < -pi) _dphi += twopi;
+  return _dphi;
+}
+inline double dphi_signed(const vec4& a, const vec4& b) noexcept {
+  return dphi_signed(a.phi(),b.phi(),a.rap(),b.rap());
+}
+
+inline double deltaR(double eta1, double eta2, double phi1, double phi2)
+noexcept {
+  return std::sqrt(sq(eta1-eta2,dphi(phi1,phi2)));
+}
+inline double deltaR(const vec4& a, const vec4& b) noexcept {
+  return deltaR(a.eta(),b.eta(),a.phi(),b.phi());
+}
+
+} // end namespace ivanp
 
 #endif

@@ -4,6 +4,8 @@
 #include <map>
 #include <optional>
 #include <memory>
+#include <algorithm>
+#include <numeric>
 
 #include <TFile.h>
 #include <TKey.h>
@@ -288,11 +290,13 @@ int main(int argc, char* argv[]) {
     h_yAbs_yy(yAbs_yy);
     h_yAbs_yy_vs_pT_yy(yAbs_yy,pT_yy);
 
-    // rel_pT_y1.punch
-    // rel_pT_y2.punch
-    // rel_sumpT_y_y_vs_rel_DpT_y_y.punch
+    const auto m_yy = higgs.m();
+    h_rel_pT_y1(A_pT[0]/m_yy);
+    h_rel_pT_y2(A_pT[1]/m_yy);
+    h_rel_sumpT_y_y_vs_rel_DpT_y_y(
+      (A_pT[0]+A_pT[1])/m_yy, (A_pT[0]-A_pT[1])/m_yy );
 
-    if (njets<1) continue; // =======================================
+    if (njets<1) continue; // 111111111111111111111111111111111111111
 
     const auto jet_pt = jets | [](const auto& jet){ return jet.pt(); };
     const auto pT_j1 = jet_pt[0];
@@ -319,14 +323,15 @@ int main(int argc, char* argv[]) {
     for (double pt : jet_pt) HT += pt;
     h_HT_30(HT);
 
-    // Dphi_j_j_30.punch
-    // Dphi_j_j_30_signed.punch
+    const auto jet_tau = jets
+      | [y=higgs.rap()](const auto& jet){ return tau(jet,y); };
 
-    // maxTau_yyj_30.punch
-    // maxTau_yyj_30_vs_pT_yy.punch
-    // sumTau_yyj_30.punch
+    const auto max_tau = *std::max_element(jet_tau.begin(),jet_tau.end());
+    h_maxTau_yyj_30(max_tau);
+    h_maxTau_yyj_30_vs_pT_yy(max_tau,pT_yy);
+    h_sumTau_yyj_30(std::accumulate(jet_tau.begin(),jet_tau.end(),0.));
 
-    if (njets<2) continue; // =======================================
+    if (njets<2) continue; // 222222222222222222222222222222222222222
 
     const auto jj = jets[0] + jets[1];
     h_m_jj_30(jj.m());
@@ -334,7 +339,9 @@ int main(int argc, char* argv[]) {
     const auto yyjj = higgs + jj;
     h_pT_yyjj_30(yyjj.pt());
 
-    // Dphi_yy_jj_30.punch
+    h_Dphi_j_j_30(dphi(jets[0],jets[1]));
+    h_Dphi_j_j_30_signed(dphi_signed(jets[0],jets[1]));
+    h_Dphi_yy_jj_30(dphi(higgs,jj));
 
   } // end event loop
   // ================================================================
