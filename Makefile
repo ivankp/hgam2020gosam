@@ -32,7 +32,8 @@ all: bin/hist
 C_hist := $(ROOT_CPPFLAGS) $(FJ_CPPFLAGS) $(LHAPDF_CPPFLAGS) -I. -DNDEBUG
 LF_hist := $(ROOT_LDFLAGS)
 L_hist := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS)
-bin/hist: .build/reweighter.o .build/Higgs2diphoton.o .build/punch.hh
+.build/hist.o: .build/punch.hh
+bin/hist: .build/reweighter.o .build/Higgs2diphoton.o
 
 C_reweighter := $(ROOT_CPPFLAGS) $(LHAPDF_CPPFLAGS)
 C_Higgs2diphoton := $(ROOT_CPPFLAGS)
@@ -50,6 +51,7 @@ bin/%: .build/%.o
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEPFLAGS) $(C_$*) -c $(filter %.cc,$^) -o $@
 
 .build/punch.hh: punchcards
+	@mkdir -pv $(dir $@)
 	@ls $< | sed 's/\.punch$$//;s/^.*/h_(&)/' > $@
 	@printf '\nstatic constexpr const char* cards_names[] {\n' >> $@
 	@sed -n 's/^h_(\(.*\))$$/  "\1",/p' $@ >> $@
