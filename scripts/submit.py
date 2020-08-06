@@ -30,7 +30,7 @@ def get(names,vals):
         '{}{}j{}_{:g}TeV_antikt{:g}_{}_{}'.format(
             x[2], x[3], x[4],
             x[5],
-            config['jet_dR']*10,
+            config['jet_R']*10,
             config['reweighting'][0]['pdf'],
             config['reweighting'][0]['scale']
         )

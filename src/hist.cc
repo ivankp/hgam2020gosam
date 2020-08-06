@@ -195,7 +195,7 @@ int main(int argc, char* argv[]) {
   vec4 higgs;
 
   const fj::JetDefinition jet_def(
-    fj::antikt_algorithm, conf.value("jet_dR",0.4) );
+    fj::antikt_algorithm, conf.value("jet_R",0.4) );
   fj::ClusterSequence::print_banner(); // get it out of the way
   cout << jet_def.description() << endl;
 
