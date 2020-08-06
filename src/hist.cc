@@ -165,6 +165,8 @@ int main(int argc, char* argv[]) {
       if (name.empty()) { if (j==0) continue; else break; }
 
       auto& dim = axes.emplace_back();
+      // add blank axis for underflow
+      if (axes.size()>1) dim.emplace_back();
 
       auto binning = [&](const auto& suffix) {
         const char* val = get(cat(prefix,"Binning",suffix),"");
@@ -183,7 +185,7 @@ int main(int argc, char* argv[]) {
     }
     if (axes.empty()) THROW("no binning in file \"",file_name,"\"");
     auto& h = *hists[card_name] = hist_t(std::move(axes));
-    cout << json(h.axes()) << '\n';
+    cout << json(h.axes()) << "  nbins: " << h.size() << '\n';
   }
   cout << endl;
 

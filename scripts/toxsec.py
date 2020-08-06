@@ -23,7 +23,7 @@ for hname, h in hf["hists"].items():
     for ws,n,nent in h['bins'][1]:
         if n>0:
             for w in ws:
-                w[1] = F2*(w[1] - w[0]/N)/(N*(N-1)) # 1310.7439 p.16
+                w[1] = F2*(w[1] - w[0]*w[0]/N)/(N*(N-1)) # 1310.7439 p.16
                 w[0] = F*w[0]/N
 
 with open(sys.argv[-1],'wb') as f:

@@ -75,7 +75,11 @@ def overflow(axes):
     o = [ False ]
     for dim in axes:
         for i,axis in enumerate(subaxes(dim,len(o))):
-            o[i] = [True] + [o[i]] * (len(axis)-1) + [True]
+            n = len(axis)
+            if n>0:
+                o[i] = [True] + [o[i]] * (n-1) + [True]
+            else:
+                o[i] = [o[i]]
         o = [ item for sublist in o for item in sublist ]
     return o
 
@@ -100,6 +104,10 @@ for k,wname in enumerate(hf['bins']):
             for y,yname in zip(y,('xsec','mc_unc','scale','pdf')):
                 # print(yname,y)
                 hout[yname].append(y)
+        for a in axes[1:]:
+            if len(a[0])!=0:
+                raise Exception("non-black first subaxis")
+            a.pop(0)
 
 with open(sys.argv[2],'w') as f:
     # json.dump(out,f,separators=(',',':'))
