@@ -279,6 +279,10 @@ int main(int argc, char* argv[]) {
     // Observables **************************************************
 
     h_N_j_30(njets);
+    for (auto i = h_N_j_30_incl.find_bin_index(njets); ; --i) {
+      h_N_j_30_incl.fill_at(i);
+      if (i==0) break;
+    }
 
     if (njets < njets_min) continue; // require minimum number of jets
 
