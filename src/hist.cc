@@ -208,10 +208,11 @@ int main(int argc, char* argv[]) {
   cout << endl;
 
   bin_t::id = -1; // so that first entry has new id
-  long unsigned Ncount = 0, Nevents = 0, Nentries = 0;
+  long unsigned Ncount = 0, Nevents = 0, Nentries = chain->GetEntries();
+  chain->LoadTree(-1); // avoid warning
 
   // EVENT LOOP =====================================================
-  for (timed_counter cnt(reader.GetEntries()); reader.Next(); ++cnt) {
+  for (timed_counter cnt(Nentries); reader.Next(); ++cnt) {
     const bool new_id = [id=*_id]{
       return (bin_t::id != id) ? ((bin_t::id = id),true) : false;
     }();
@@ -219,7 +220,6 @@ int main(int argc, char* argv[]) {
       Ncount += (_ncount ? **_ncount : 1);
       ++Nevents;
     }
-    ++Nentries;
 
     // read 4-momenta -----------------------------------------------
     partons.clear();

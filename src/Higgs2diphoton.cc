@@ -4,7 +4,7 @@
 #include "Higgs2diphoton.hh"
 
 Higgs2diphoton::Higgs2diphoton(seed_type seed)
-: gen(seed ?: std::chrono::system_clock::now().time_since_epoch().count()),
+: gen(seed ? seed : std::chrono::system_clock::now().time_since_epoch().count()),
   phi_dist(0.,2*M_PI), cts_dist(-1.,1.)
 { }
 

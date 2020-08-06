@@ -64,7 +64,7 @@ LD_LIBRARY_PATH = os.environ['LD_LIBRARY_PATH']
 
 def condor(chunk):
     script = loc+'/condor/'+chunk[0]+'.sh'
-    config['njets_min'] = chunk[3]
+    config['njets_min'] = chunk[2]
     with open(script,'w') as f:
         f.write('''\
 #!/bin/bash
@@ -91,7 +91,8 @@ Queue
 '''.format(chunk[0])
 
 params = tuple(zip(
-    ('njets',(1,2,3)),
+    # ('njets',(1,2,3)),
+    ('njets',(1,)),
     ('part',('B','RS','I','V')),
     ('particle',('H',)),
     ('energy',(13,))
@@ -100,10 +101,10 @@ params = tuple(zip(
 infos = [
     ({ 'njets': 1 },
      [ 'GGFHT pt25.0 eta4.5' ]),
-    ({ 'njets': 2 },
-     [ 'ED GGFHT pt25.0 eta4.5' ]),
-    ({ 'njets': 3 },
-     [ 'ED GGFHT pt25.0 eta4.5' ]),
+    # ({ 'njets': 2 },
+    #  [ 'ED GGFHT pt25.0 eta4.5' ]),
+    # ({ 'njets': 3 },
+    #  [ 'ED GGFHT pt25.0 eta4.5' ]),
 ]
 
 os.chdir(loc+'/condor')

@@ -5,7 +5,7 @@
   "jet_dR": 0.4,
   "njets_min": 1,
   "reweighting": [
-    { "pdf": "CT14nlo",
+    { "pdf": "PDF4LHC15_nlo_30",
       "pdf_var": true,
       "scale": "HT1",
       "ren_fac": [ [1,1],[0.5,0.5],[1,0.5],[0.5,1],[2,1],[1,2],[2,2] ]
