@@ -11,7 +11,7 @@ class Higgs2diphoton {
   std::uniform_real_distribution<double> phi_dist; // φ
   std::uniform_real_distribution<double> cts_dist; // cos(θ*)
 
-  ivanp::vec3 photon;
+  ivanp::vec3 cm_photon;
 
 public:
   Higgs2diphoton();

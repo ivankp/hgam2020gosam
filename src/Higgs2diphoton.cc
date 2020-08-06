@@ -18,14 +18,14 @@ Higgs2diphoton::operator()(const vec_t& Higgs, bool new_kin) {
     const double cos_phi = std::cos(phi);
     const double sin_phi = std::sin(phi);
 
-    photon = { cos_phi*sts, sin_phi*sts, cts };
+    cm_photon = { cos_phi*sts, sin_phi*sts, cts };
   }
 
   const double E = Higgs.m()/2;
   const auto boost = Higgs.boost_vector();
 
-  auto new_photon = photon;
-  new_photon.rotate_u_z(boost.normalized()) *= E;
+  auto photon = cm_photon;
+  photon.rotate_u_z(boost.normalized()) *= E;
 
   photons_type diphoton {{ {photon,E}, {-photon,E} }};
   std::get<0>(diphoton) >> boost;
