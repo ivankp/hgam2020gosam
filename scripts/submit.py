@@ -91,8 +91,7 @@ Queue
 '''.format(chunk[0])
 
 params = tuple(zip(
-    # ('njets',(1,2,3)),
-    ('njets',(1,)),
+    ('njets',(1,2,3)),
     ('part',('B','RS','I','V')),
     ('particle',('H',)),
     ('energy',(13,))
@@ -101,10 +100,10 @@ params = tuple(zip(
 infos = [
     ({ 'njets': 1 },
      [ 'GGFHT pt25.0 eta4.5' ]),
-    # ({ 'njets': 2 },
-    #  [ 'ED GGFHT pt25.0 eta4.5' ]),
-    # ({ 'njets': 3 },
-    #  [ 'ED GGFHT pt25.0 eta4.5' ]),
+    ({ 'njets': 2 },
+     [ 'ED GGFHT pt25.0 eta4.5' ]),
+    ({ 'njets': 3 },
+     [ 'ED GGFHT pt25.0 eta4.5' ]),
 ]
 
 os.chdir(loc+'/condor')

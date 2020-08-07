@@ -14,5 +14,5 @@ condor/
 
 output
 tmp
-test.*
+test*
 

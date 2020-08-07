@@ -211,7 +211,6 @@ int main(int argc, char* argv[]) {
 
   bin_t::id = -1; // so that first entry has new id
   long unsigned Ncount = 0, Nevents = 0, Nentries = chain->GetEntries();
-  chain->LoadTree(-1); // avoid warning
 
   // EVENT LOOP =====================================================
   for (timed_counter cnt(Nentries); reader.Next(); ++cnt) {
