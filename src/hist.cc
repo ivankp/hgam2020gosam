@@ -267,12 +267,13 @@ int main(int argc, char* argv[]) {
     const unsigned njets = jets.size(); // number of clustered jets
 
     // set weights --------------------------------------------------
-    bin_t::weight[0] = *_weight2;
-
-    for (auto& rew : reweighters) {
-      rew(); // reweight this event
-      for (unsigned i=0, n=rew.nweights(); i<n; ++i)
-        bin_t::weight[i+1] = rew[i];
+    { auto w = bin_t::weight.begin();
+      *w = *_weight2;
+      for (auto& rew : reweighters) {
+        rew(); // reweight this event
+        for (unsigned i=0, n=rew.nweights(); i<n; ++i)
+          *++w = rew[i];
+      }
     }
 
     // Observables **************************************************
