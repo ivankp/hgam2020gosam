@@ -17,14 +17,15 @@ from matplotlib.backends.backend_pdf import PdfPages
 with open(sys.argv[1],'r') as f:
     hf = json.load(f)
 
-rew = 'HT1 PDF4LHC15_nlo_30'
+rew = None
+# rew = 'HT1 PDF4LHC15_nlo_30'
 
 def mult(xs,f):
     for x in xs:
         yield from f(x)
 
 with PdfPages(sys.argv[2]) as out:
-    for name, hist in hf[rew].items():
+    for name, hist in (hf if rew is None else hf[rew]).items():
         print(name)
 
         for key, val in hist.items():
@@ -79,7 +80,7 @@ with PdfPages(sys.argv[2]) as out:
                 plt.text(x, y+0.03*ymax, '{:.3g}'.format(y),
                     ha='center', fontsize=8,
                     rotation=(45 if (y>0) and (n>=12 or (n>=10 and y<1e-2)) else 0))
-            plt.text(x, -0.07*ymax, '{}'.format(i), ha='center')
+            plt.text(x, -0.07*ymax, '{}'.format(i+1), ha='center')
 
         plt.legend(ncol=2)
 
